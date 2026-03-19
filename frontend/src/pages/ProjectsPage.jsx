@@ -22,7 +22,7 @@ export default function ProjectsPage() {
   return (
     <div style={{ maxWidth: 800, margin: '60px auto', padding: '0 20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700, color: '#4a9eff' }}>Hamina Planner</h1>
+        <h1 style={{ fontSize: 28, fontWeight: 700, color: '#4a9eff' }}>Wifi Planner by Marcone</h1>
         <button onClick={() => setShowForm(true)} style={{ background: '#4a9eff', color: '#fff', padding: '10px 20px' }}>
           + Nuovo Progetto
         </button>

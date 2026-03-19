@@ -29,9 +29,11 @@ class FloorResponse(BaseModel):
     file_path: Optional[str]
     thumbnail_path: Optional[str]
     file_type: Optional[str]
+    original_filename: Optional[str] = None
     width_px: Optional[int]
     height_px: Optional[int]
     scale_factor: float
+    pixels_per_meter: float
     processed: bool
     created_at: datetime
     model_config = {"from_attributes": True}
@@ -44,6 +46,9 @@ class WallCreate(BaseModel):
     thickness: float = 1.0
     wall_type: str = "concrete"
     attenuation_db: float = 12.0
+    attenuation_5ghz: float = 0.0
+    floor_id: Optional[str] = None
+    group_id: Optional[str] = None
 
 class WallResponse(BaseModel):
     id: str
@@ -55,6 +60,8 @@ class WallResponse(BaseModel):
     thickness: float
     wall_type: str
     attenuation_db: float
+    attenuation_5ghz: float = 0.0
+    group_id: Optional[str] = None
     model_config = {"from_attributes": True}
 
 class AccessPointCreate(BaseModel):
@@ -64,6 +71,7 @@ class AccessPointCreate(BaseModel):
     y: float
     tx_power_dbm: float = 20.0
     frequency_ghz: float = 5.0
+    floor_id: Optional[str] = None
 
 class AccessPointResponse(BaseModel):
     id: str

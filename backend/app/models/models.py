@@ -24,9 +24,11 @@ class Floor(Base):
     file_path: Mapped[str | None] = mapped_column(String(512))
     thumbnail_path: Mapped[str | None] = mapped_column(String(512))
     file_type: Mapped[str | None] = mapped_column(String(20))
+    original_filename: Mapped[str | None] = mapped_column(String(512), nullable=True)
     width_px: Mapped[int | None] = mapped_column(Integer)
     height_px: Mapped[int | None] = mapped_column(Integer)
     scale_factor: Mapped[float] = mapped_column(Float, default=1.0)
+    pixels_per_meter: Mapped[float] = mapped_column(Float, default=0.0)
     processed: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     project: Mapped["Project"] = relationship(back_populates="floors")
@@ -44,6 +46,8 @@ class Wall(Base):
     thickness: Mapped[float] = mapped_column(Float, default=1.0)
     wall_type: Mapped[str] = mapped_column(String(50), default="concrete")
     attenuation_db: Mapped[float] = mapped_column(Float, default=12.0)
+    attenuation_5ghz: Mapped[float] = mapped_column(Float, default=0.0)
+    group_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     floor: Mapped["Floor"] = relationship(back_populates="walls")
 
 class AccessPoint(Base):

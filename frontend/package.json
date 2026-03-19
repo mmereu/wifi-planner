@@ -11,7 +11,8 @@
     "konva": "^9.3.3",
     "zustand": "^4.5.2",
     "axios": "^1.6.7",
-    "lucide-react": "^0.344.0"
+    "lucide-react": "^0.344.0",
+    "jspdf": "^2.5.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.1",
