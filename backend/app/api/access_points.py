@@ -13,6 +13,16 @@ async def list_aps(floor_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(AccessPoint).where(AccessPoint.floor_id == floor_id))
     return result.scalars().all()
 
+@router.post("/api/floors/{floor_id}/access-points", response_model=AccessPointResponse)
+async def create_ap_for_floor(floor_id: str, data: AccessPointCreate, db: AsyncSession = Depends(get_db)):
+    payload = data.model_dump()
+    payload["floor_id"] = floor_id
+    ap = AccessPoint(id=str(uuid.uuid4()), **payload)
+    db.add(ap)
+    await db.commit()
+    await db.refresh(ap)
+    return ap
+
 @router.post("/api/access-points", response_model=AccessPointResponse)
 async def create_ap(data: AccessPointCreate, db: AsyncSession = Depends(get_db)):
     ap = AccessPoint(id=str(uuid.uuid4()), **data.model_dump())
