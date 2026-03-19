@@ -2,6 +2,9 @@
 
 **[Italiano](#italiano) | [English](#english)**
 
+![AP Placement](docs/screenshots/ap-placement.png)
+![Heatmap Coverage](docs/screenshots/heatmap-coverage.png)
+
 ---
 
 ## Italiano
