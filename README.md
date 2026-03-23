@@ -14,10 +14,12 @@ Strumento web di pianificazione WiFi per il posizionamento di access point su pl
 ### Funzionalità
 
 - **Importazione planimetrie** — Carica PDF, DXF/DWG o immagini
+- **Rotazione planimetria** — Ruota la vista di 90° (↺↻) per adattare planimetrie in orientamento non standard
 - **Calibrazione scala obbligatoria** — All'apertura di ogni nuovo piano
-- **Disegno muri** — Catena continua, materiali diversi (cemento, cartongesso, vetro, legno)
+- **Disegno muri** — Catena continua, materiali diversi (cemento, cartongesso, vetro, vetro Low-E, mattone, metallo, porte, finestre)
+- **Scaffalature supermercato** — Tool dedicato (🛒) per disegnare scaffali come segmenti orientabili; 3 tipi con attenuazione RF realistica: Vuoto (5/8 dB), Pieno (12/20 dB), Freschi/refrigerato (16/28 dB a 2.4/5 GHz)
 - **Posizionamento AP** — Icone blu draggabili con nome, doppio click per eliminare
-- **Heatmap WiFi** — Due modalità: Copertura segnale + Overlap AP (interferenza)
+- **Heatmap WiFi** — Due modalità: Copertura segnale + Overlap AP (interferenza); include l'attenuazione delle scaffalature nel calcolo
 - **Tooltip dBm** — Valore segnale in tempo reale al passaggio del mouse
 - **Righello** — Misura distanze sulla planimetria
 - **Esportazione PDF** — Planimetria completa con AP, muri e heatmap
@@ -122,6 +124,12 @@ All'apertura di un nuovo piano appare un overlay blu:
 5. Inserisci la **distanza reale in centimetri** (es. "500" per 5 metri)
 6. La scala viene salvata e mostrata in alto (es. "Scala: 56.7 px/m")
 
+#### Ruotare la Planimetria
+
+1. In alto a destra della mappa trovi i bottoni **↺** e **↻**
+2. Ogni click ruota la vista di 90° in senso antiorario o orario
+3. La rotazione è solo visiva e non altera i dati salvati
+
 #### Disegnare i Muri
 
 1. Clicca il tool **"Muro"** nella toolbar
@@ -133,6 +141,17 @@ All'apertura di un nuovo piano appare un overlay blu:
 7. **Click destro** = interrompi la catena
 8. **Spacebar** = tieni premuto per spostare la vista (pan) mentre disegni
 9. Per **cancellare**: passa a "Seleziona", poi doppio click sul muro > "OK"
+
+#### Disegnare le Scaffalature (supermercati)
+
+1. Clicca il tool **"Scaffali"** (🛒) nella toolbar
+2. Seleziona il **tipo** dal menu a tendina:
+   - **Scaffale vuoto** — attenuazione 5/8 dB (2.4/5 GHz)
+   - **Scaffale pieno** — attenuazione 12/20 dB
+   - **Scaffale freschi** — attenuazione 16/28 dB (prodotti refrigerati con umidità)
+3. Disegna esattamente come i muri (catena continua, click destro per interrompere)
+4. Ogni segmento mostra un'etichetta con il tipo di scaffale
+5. La heatmap calcola automaticamente l'attenuazione dei segmenti attraversati
 
 #### Piazzare gli Access Point
 
@@ -185,6 +204,12 @@ Path Loss (dB) = PL_ref + 10 * n * log10(d_3D) + clutter * d + Σ(wall_attenuati
 | Attenuazione cemento (5 GHz) | 25 dB |
 | Attenuazione cartongesso (2.4 GHz) | 3 dB |
 | Attenuazione cartongesso (5 GHz) | 5 dB |
+| Scaffale vuoto (2.4 GHz) | 5 dB |
+| Scaffale vuoto (5 GHz) | 8 dB |
+| Scaffale pieno (2.4 GHz) | 12 dB |
+| Scaffale pieno (5 GHz) | 20 dB |
+| Scaffale freschi (2.4 GHz) | 16 dB |
+| Scaffale freschi (5 GHz) | 28 dB |
 
 ### Specifiche AP Supportati — Extreme Networks AP3000
 
@@ -222,10 +247,12 @@ Web-based WiFi planning tool for positioning access points on floor plans. Simul
 ### Features
 
 - **Floor plan import** — Upload PDF, DXF/DWG or images
+- **Floor plan rotation** — Rotate the view by 90° (↺↻) to handle non-standard orientations
 - **Mandatory scale calibration** — Required when opening each new floor
-- **Wall drawing** — Continuous chain mode, multiple materials (concrete, drywall, glass, wood)
+- **Wall drawing** — Continuous chain mode, multiple materials (concrete, drywall, glass, Low-E glass, brick, metal, doors, windows)
+- **Supermarket shelving** — Dedicated 🛒 tool to draw shelves as orientable line segments; 3 types with realistic RF attenuation: Empty (5/8 dB), Full (12/20 dB), Refrigerated/wet (16/28 dB at 2.4/5 GHz)
 - **AP placement** — Draggable blue icons with name label, double-click to delete
-- **WiFi heatmap** — Two modes: Signal Coverage + AP Overlap (interference)
+- **WiFi heatmap** — Two modes: Signal Coverage + AP Overlap (interference); shelving attenuation included in signal calculation
 - **dBm tooltip** — Real-time signal value on mouse hover
 - **Ruler tool** — Measure distances on the floor plan
 - **PDF export** — Complete floor plan with APs, walls and heatmap
@@ -330,6 +357,12 @@ When opening a new floor, a blue overlay appears:
 5. Enter the **real distance in centimeters** (e.g., "500" for 5 meters)
 6. The scale is saved and shown at the top (e.g., "Scale: 56.7 px/m")
 
+#### Rotate the Floor Plan
+
+1. In the top-right corner of the map, use the **↺** and **↻** buttons
+2. Each click rotates the view 90° counter-clockwise or clockwise
+3. Rotation is visual only and does not affect saved data
+
 #### Draw Walls
 
 1. Click the **"Muro"** (Wall) tool in the toolbar
@@ -341,6 +374,17 @@ When opening a new floor, a blue overlay appears:
 7. **Right click** = stop the chain
 8. **Spacebar** = hold to pan the view while drawing
 9. To **delete**: switch to "Seleziona" (Select), then double-click on wall > confirm
+
+#### Draw Shelving Units (supermarkets/warehouses)
+
+1. Click the **"Scaffali"** (🛒) tool in the toolbar
+2. Select the **type** from the dropdown:
+   - **Scaffale vuoto** (Empty shelf) — 5/8 dB attenuation (2.4/5 GHz)
+   - **Scaffale pieno** (Full shelf) — 12/20 dB attenuation
+   - **Scaffale freschi** (Refrigerated shelf) — 16/28 dB attenuation (moisture content)
+3. Draw exactly like walls (continuous chain, right-click to stop)
+4. Each segment displays a label with the shelf type
+5. The heatmap automatically accounts for shelf attenuation on crossed segments
 
 #### Place Access Points
 
@@ -393,6 +437,12 @@ Path Loss (dB) = PL_ref + 10 * n * log10(d_3D) + clutter * d + sum(wall_attenuat
 | Concrete attenuation (5 GHz) | 25 dB |
 | Drywall attenuation (2.4 GHz) | 3 dB |
 | Drywall attenuation (5 GHz) | 5 dB |
+| Empty shelf (2.4 GHz) | 5 dB |
+| Empty shelf (5 GHz) | 8 dB |
+| Full shelf (2.4 GHz) | 12 dB |
+| Full shelf (5 GHz) | 20 dB |
+| Refrigerated shelf (2.4 GHz) | 16 dB |
+| Refrigerated shelf (5 GHz) | 28 dB |
 
 ### Supported AP Specifications — Extreme Networks AP3000
 
