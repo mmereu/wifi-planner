@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 import os
 from .core.database import create_tables
 from .core.config import settings
-from .api import projects, floors, walls, access_points
+from .api import projects, floors, walls, access_points, shelving_zones
 
 app = FastAPI(title="Hamina Planner", version="0.1.0")
 
@@ -20,6 +20,7 @@ app.include_router(projects.router)
 app.include_router(floors.router)
 app.include_router(walls.router)
 app.include_router(access_points.router)
+app.include_router(shelving_zones.router, prefix="/api")
 
 os.makedirs(settings.upload_dir, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.upload_dir), name="uploads")

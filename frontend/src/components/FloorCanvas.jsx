@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { Stage, Layer, Image, Line, Circle, Text, Rect } from 'react-konva';
+import { Stage, Layer, Image, Line, Circle, Text, Rect, Group } from 'react-konva';
 import useStore from '../store/useStore';
 import { getMaterial } from '../lib/wallMaterials';
 import WALL_MATERIALS from '../lib/wallMaterials';
@@ -13,17 +13,26 @@ function getImageUrl(floor) {
 }
 
 const TOOL_INSTRUCTIONS = {
-  scale: 'Clicca due punti con distanza nota',
-  measure: 'Clicca due punti per misurare la distanza',
-  drawWall: 'Clicca per iniziare un muro (Shift = dritto)',
-  placeAP: 'Clicca per piazzare un Access Point',
+  scale:      'Clicca due punti con distanza nota',
+  measure:    'Clicca due punti per misurare la distanza',
+  drawWall:   'Clicca per iniziare un muro (Shift = dritto)',
+  drawShelf:  'Clicca per iniziare uno scaffale (Shift = dritto, tasto destro = fine)',
+  placeAP:    'Clicca per piazzare un Access Point',
+  drawZone:   'Clicca angolo iniziale, poi angolo finale per disegnare la zona scaffali',
 };
+
+export const ZONE_TYPES = [
+  { id: 'shelf_empty', name: 'Scaffale vuoto',   color: 'rgba(255,220,0,0.35)',   atten24: 5,  atten5: 8  },
+  { id: 'shelf_full',  name: 'Scaffale pieno',   color: 'rgba(255,140,0,0.4)',    atten24: 12, atten5: 20 },
+  { id: 'shelf_wet',   name: 'Scaffale freschi', color: 'rgba(0,140,220,0.35)',   atten24: 16, atten5: 28 },
+];
 
 export default function FloorCanvas() {
   const {
     currentFloor,
     walls,
     accessPoints,
+    shelvingZones,
     placeAP,
     loading,
     activeTool,
@@ -41,10 +50,13 @@ export default function FloorCanvas() {
     stopGroup,
     updateAP,
     deleteAP,
+    addShelvingZone,
+    deleteShelvingZone,
     pixelsPerMeter,
     selectedFrequency,
     showHeatmap,
     heatmapMode,
+    selectedZoneType,
   } = useStore();
 
   const containerRef = useRef();
@@ -63,13 +75,14 @@ export default function FloorCanvas() {
   const [measureStart, setMeasureStart] = useState(null); // ruler start point
   const [measureEnd, setMeasureEnd] = useState(null); // ruler end point (confirmed)
   const [spaceHeld, setSpaceHeld] = useState(false);
+  const [floorRotation, setFloorRotation] = useState(0); // 0, 90, 180, 270
+  const contentGroupRef = useRef(null);
+  const [zoneStart, setZoneStart] = useState(null); // {x,y} first corner of zone rect
 
-  // Reset measure when switching tools
+  // Reset transient state when switching tools
   useEffect(() => {
-    if (activeTool !== 'measure') {
-      setMeasureStart(null);
-      setMeasureEnd(null);
-    }
+    if (activeTool !== 'measure') { setMeasureStart(null); setMeasureEnd(null); }
+    if (activeTool !== 'drawZone') { setZoneStart(null); }
   }, [activeTool]);
 
   // ResizeObserver
@@ -90,6 +103,7 @@ export default function FloorCanvas() {
     setScale(1);
     setPos({ x: 0, y: 0 });
     setSelectedGroupKey(null);
+    setFloorRotation(0);
     if (!currentFloor) return;
 
     const url = getImageUrl(currentFloor);
@@ -149,7 +163,7 @@ export default function FloorCanvas() {
   // Right-click to stop wall chain + end group
   useEffect(() => {
     const handleContextMenu = (e) => {
-      if (activeTool === 'drawWall') {
+      if (activeTool === 'drawWall' || activeTool === 'drawShelf') {
         e.preventDefault();
         if (drawingWallStart) {
           stopGroup();
@@ -183,15 +197,16 @@ export default function FloorCanvas() {
 
   // Mouse move: update drawing/scale preview + heatmap tooltip
   const handleMouseMove = useCallback((e) => {
-    const stage = e.target.getStage();
-    const pointer = stage.getPointerPosition();
-    const imgX = (pointer.x - pos.x) / scale;
-    const imgY = (pointer.y - pos.y) / scale;
+    if (!contentGroupRef.current) return;
+    const pt = contentGroupRef.current.getRelativePointerPosition();
+    const imgX = pt.x;
+    const imgY = pt.y;
 
     const needsPreview =
-      (activeTool === 'drawWall' && drawingWallStart) ||
+      ((activeTool === 'drawWall' || activeTool === 'drawShelf') && drawingWallStart) ||
       (activeTool === 'scale' && scalePoint1 && !scalePoint2) ||
-      (activeTool === 'measure' && measureStart && !measureEnd);
+      (activeTool === 'measure' && measureStart && !measureEnd) ||
+      (activeTool === 'drawZone' && zoneStart);
     if (needsPreview) {
       setMousePos({ x: imgX, y: imgY });
     }
@@ -206,7 +221,7 @@ export default function FloorCanvas() {
       setSignalAtCursor(null);
       setOverlapAtCursor(null);
     }
-  }, [activeTool, drawingWallStart, scalePoint1, scalePoint2, measureStart, measureEnd, pos, scale, showHeatmap]);
+  }, [activeTool, drawingWallStart, scalePoint1, scalePoint2, measureStart, measureEnd, zoneStart, showHeatmap]);
 
   const handleWallClick = useCallback((wall, e) => {
     if (activeTool !== 'select') return;
@@ -224,10 +239,10 @@ export default function FloorCanvas() {
     // In select mode, ignore clicks on wall Lines (handled by handleWallClick)
     if (activeTool === 'select' && e.target !== e.target.getStage() && e.target.getClassName() === 'Line') return;
 
-    const stage = e.target.getStage();
-    const pointer = stage.getPointerPosition();
-    const x = (pointer.x - pos.x) / scale;
-    const y = (pointer.y - pos.y) / scale;
+    if (!contentGroupRef.current) return;
+    const pt = contentGroupRef.current.getRelativePointerPosition();
+    const x = pt.x;
+    const y = pt.y;
 
     const snap = (x1, y1, x2, y2) => {
       if (e.evt.shiftKey) {
@@ -262,20 +277,13 @@ export default function FloorCanvas() {
         break;
 
       case 'drawWall':
+      case 'drawShelf':
         if (!drawingWallStart) {
-          console.log('[WALL] Start point set:', x, y);
           setDrawingWallStart({ x, y });
           setMousePos({ x, y });
         } else {
           const end = snap(drawingWallStart.x, drawingWallStart.y, x, y);
-          console.log('[WALL] Creating wall from', drawingWallStart, 'to', end);
-          try {
-            await addWall(drawingWallStart.x, drawingWallStart.y, end.x, end.y);
-            console.log('[WALL] Wall created OK');
-          } catch (err) {
-            console.error('[WALL] addWall FAILED:', err);
-          }
-          // Chain: next wall starts from this endpoint
+          await addWall(drawingWallStart.x, drawingWallStart.y, end.x, end.y);
           setDrawingWallStart({ x: end.x, y: end.y });
           setMousePos({ x: end.x, y: end.y });
         }
@@ -303,6 +311,25 @@ export default function FloorCanvas() {
         break;
       }
 
+      case 'drawZone': {
+        if (!zoneStart) {
+          setZoneStart({ x, y });
+          setMousePos({ x, y });
+        } else {
+          const rx = Math.min(zoneStart.x, x);
+          const ry = Math.min(zoneStart.y, y);
+          const rw = Math.abs(x - zoneStart.x);
+          const rh = Math.abs(y - zoneStart.y);
+          if (rw > 5 && rh > 5) {
+            const zt = ZONE_TYPES.find(t => t.id === selectedZoneType) || ZONE_TYPES[1];
+            await addShelvingZone(rx, ry, rw, rh, selectedZoneType, zt.atten24, zt.atten5);
+          }
+          setZoneStart(null);
+          setMousePos(null);
+        }
+        break;
+      }
+
       default:
         break;
     }
@@ -313,8 +340,8 @@ export default function FloorCanvas() {
     drawingWallStart,
     measureStart,
     measureEnd,
-    pos,
-    scale,
+    zoneStart,
+    selectedZoneType,
     accessPoints.length,
     setScalePoint1,
     setScalePoint2,
@@ -322,6 +349,7 @@ export default function FloorCanvas() {
     setDrawingWallStart,
     addWall,
     placeAP,
+    addShelvingZone,
   ]);
 
   // Compute distinct material types from walls on the floor
@@ -350,7 +378,7 @@ export default function FloorCanvas() {
     const ppm = pixelsPerMeter > 0 ? pixelsPerMeter : bgImage.width / 30;
     const w = bgImage.width;
     const h = bgImage.height;
-    const result = generateHeatmap(w, h, accessPoints, walls, ppm, selectedFrequency, heatmapMode);
+    const result = generateHeatmap(w, h, accessPoints, walls, shelvingZones, ppm, selectedFrequency, heatmapMode);
     if (!result) { setHeatmapImage(null); heatmapGridRef.current = null; return; }
     heatmapGridRef.current = result;
     const offCanvas = document.createElement('canvas');
@@ -361,7 +389,7 @@ export default function FloorCanvas() {
     const img = new window.Image();
     img.src = offCanvas.toDataURL();
     img.onload = () => setHeatmapImage(img);
-  }, [showHeatmap, bgImage, accessPoints, walls, pixelsPerMeter, selectedFrequency, heatmapMode]);
+  }, [showHeatmap, bgImage, accessPoints, walls, shelvingZones, pixelsPerMeter, selectedFrequency, heatmapMode]);
 
   // Determine cursor style
   const cursor = (() => {
@@ -463,8 +491,14 @@ export default function FloorCanvas() {
           {activeTool === 'scale' && scalePoint1 && !scalePoint2 && (
             <span style={{ marginLeft: 8, color: '#ff6b6b' }}>• Primo punto impostato — clicca il secondo</span>
           )}
-          {activeTool === 'drawWall' && drawingWallStart && (
-            <span style={{ marginLeft: 8, color: '#ffd93d' }}>• Inizio impostato — clicca per chiudere il muro</span>
+          {(activeTool === 'drawWall' || activeTool === 'drawShelf') && drawingWallStart && (
+            <span style={{ marginLeft: 8, color: '#ffd93d' }}>• Inizio impostato — clicca per continuare</span>
+          )}
+          {activeTool === 'drawZone' && !zoneStart && (
+            <span style={{ marginLeft: 8, color: '#27ae60' }}>• Clicca l'angolo in alto a sinistra dello scaffale</span>
+          )}
+          {activeTool === 'drawZone' && zoneStart && (
+            <span style={{ marginLeft: 8, color: '#ffd93d' }}>• Angolo iniziale impostato — clicca l'angolo opposto</span>
           )}
         </div>
       )}
@@ -478,6 +512,22 @@ export default function FloorCanvas() {
           Reset
         </button>
       </div>
+
+      {/* Rotate buttons */}
+      {bgImage && (
+        <div style={{ position: 'absolute', top: 46, right: 10, zIndex: 10, display: 'flex', gap: 4 }}>
+          <button
+            onClick={() => setFloorRotation(r => (r - 90 + 360) % 360)}
+            title="Ruota 90° sinistra"
+            style={{ background: '#1a4a8a', color: '#fff', fontSize: 14, padding: '4px 8px', border: 'none', borderRadius: 6, cursor: 'pointer' }}
+          >↺</button>
+          <button
+            onClick={() => setFloorRotation(r => (r + 90) % 360)}
+            title="Ruota 90° destra"
+            style={{ background: '#1a4a8a', color: '#fff', fontSize: 14, padding: '4px 8px', border: 'none', borderRadius: 6, cursor: 'pointer' }}
+          >↻</button>
+        </div>
+      )}
 
       {/* Konva Stage */}
       <Stage
@@ -497,42 +547,113 @@ export default function FloorCanvas() {
         style={{ cursor }}
       >
         <Layer>
+          <Group
+            ref={contentGroupRef}
+            rotation={floorRotation}
+            x={bgImage ? bgImage.width / 2 : 0}
+            y={bgImage ? bgImage.height / 2 : 0}
+            offsetX={bgImage ? bgImage.width / 2 : 0}
+            offsetY={bgImage ? bgImage.height / 2 : 0}
+          >
           {/* Background floor image */}
           {bgImage && <Image image={bgImage} />}
 
-          {/* Walls */}
+          {/* Shelving zones */}
+          {shelvingZones.map(zone => {
+            const zt = ZONE_TYPES.find(t => t.id === zone.zone_type) || ZONE_TYPES[1];
+            // Parse rgba color for Konva
+            const m = zt.color.match(/rgba\((\d+),(\d+),(\d+),([\d.]+)\)/);
+            const [, r, g, b, a] = m || [, 255, 140, 0, 0.4];
+            return (
+              <React.Fragment key={zone.id}>
+                <Rect
+                  x={zone.x} y={zone.y} width={zone.width} height={zone.height}
+                  fill={`rgb(${r},${g},${b})`} opacity={parseFloat(a)}
+                  stroke={`rgb(${r},${g},${b})`} strokeWidth={2 / scale}
+                  onDblClick={(e) => {
+                    if (activeTool !== 'select') return;
+                    e.cancelBubble = true;
+                    if (confirm(`Eliminare zona "${zt.name}"?`)) deleteShelvingZone(zone.id);
+                  }}
+                />
+                <Text
+                  x={zone.x + 4 / scale} y={zone.y + 4 / scale}
+                  text={zt.name} fontSize={11 / scale} fill="#fff" fontStyle="bold"
+                  stroke="#000" strokeWidth={0.4 / scale} listening={false}
+                />
+              </React.Fragment>
+            );
+          })}
+
+          {/* Zone preview while drawing */}
+          {activeTool === 'drawZone' && zoneStart && mousePos && (() => {
+            const zt = ZONE_TYPES.find(t => t.id === selectedZoneType) || ZONE_TYPES[1];
+            const m = zt.color.match(/rgba\((\d+),(\d+),(\d+),([\d.]+)\)/);
+            const [, r, g, b, a] = m || [, 255, 140, 0, 0.4];
+            return (
+              <Rect
+                x={Math.min(zoneStart.x, mousePos.x)} y={Math.min(zoneStart.y, mousePos.y)}
+                width={Math.abs(mousePos.x - zoneStart.x)} height={Math.abs(mousePos.y - zoneStart.y)}
+                fill={`rgb(${r},${g},${b})`} opacity={parseFloat(a) * 0.7}
+                stroke={`rgb(${r},${g},${b})`} strokeWidth={2 / scale}
+                dash={[8 / scale, 4 / scale]} listening={false}
+              />
+            );
+          })()}
+
+          {/* Walls + Shelves */}
           {walls.map((wall) => {
             const mat = getMaterial(wall.wall_type);
             const key = wall.group_id || wall.id;
             const isSelected = key === selectedGroupKey;
+            const isShelf = wall.wall_type?.startsWith('shelf_');
+            const shelfLabel = { shelf_empty: 'Scaffale vuoto', shelf_full: 'Scaffale pieno', shelf_wet: 'Scaffale freschi' }[wall.wall_type];
+            const midX = (wall.x1 + wall.x2) / 2;
+            const midY = (wall.y1 + wall.y2) / 2;
+            const angleDeg = Math.atan2(wall.y2 - wall.y1, wall.x2 - wall.x1) * 180 / Math.PI;
             return (
-              <Line
-                key={wall.id}
-                points={[wall.x1, wall.y1, wall.x2, wall.y2]}
-                stroke={isSelected ? '#ff4400' : mat.color}
-                strokeWidth={Math.max(6, mat.thickness * 3) + (isSelected ? 4 : 0)}
-                dash={mat.dashed ? [12, 6] : undefined}
-                opacity={0.92}
-                lineCap="round"
-                lineJoin="round"
-                hitStrokeWidth={18}
-                onClick={(e) => handleWallClick(wall, e)}
-                onDblClick={(e) => {
-                  if (activeTool !== 'select') return;
-                  e.cancelBubble = true;
-                  const groupKey = wall.group_id || wall.id;
-                  const count = wall.group_id ? walls.filter(w => w.group_id === wall.group_id).length : 1;
-                  if (confirm(`Eliminare ${count > 1 ? count + ' muri (gruppo)' : 'questo muro'}?`)) {
-                    deleteWall(groupKey);
-                    setSelectedGroupKey(null);
-                  }
-                }}
-              />
+              <React.Fragment key={wall.id}>
+                <Line
+                  points={[wall.x1, wall.y1, wall.x2, wall.y2]}
+                  stroke={isSelected ? '#ff4400' : mat.color}
+                  strokeWidth={isShelf ? Math.max(2, mat.thickness * 1.5) + (isSelected ? 3 : 0) : Math.max(6, mat.thickness * 3) + (isSelected ? 4 : 0)}
+                  dash={mat.dashed ? [12, 6] : undefined}
+                  opacity={0.92}
+                  lineCap="round"
+                  lineJoin="round"
+                  hitStrokeWidth={18}
+                  onClick={(e) => handleWallClick(wall, e)}
+                  onDblClick={(e) => {
+                    if (activeTool !== 'select') return;
+                    e.cancelBubble = true;
+                    const groupKey = wall.group_id || wall.id;
+                    const count = wall.group_id ? walls.filter(w => w.group_id === wall.group_id).length : 1;
+                    if (confirm(`Eliminare ${count > 1 ? count + ' elementi (gruppo)' : isShelf ? 'questo scaffale' : 'questo muro'}?`)) {
+                      deleteWall(groupKey);
+                      setSelectedGroupKey(null);
+                    }
+                  }}
+                />
+                {isShelf && shelfLabel && (
+                  <Text
+                    x={midX} y={midY}
+                    text={shelfLabel}
+                    fontSize={10 / scale}
+                    fill={mat.color}
+                    fontStyle="bold"
+                    rotation={angleDeg}
+                    offsetX={shelfLabel.length * 3 / scale}
+                    offsetY={12 / scale}
+                    stroke="#000" strokeWidth={0.3 / scale}
+                    listening={false}
+                  />
+                )}
+              </React.Fragment>
             );
           })}
 
           {/* Drawing preview line */}
-          {activeTool === 'drawWall' && drawingWallStart && previewEnd && (() => {
+          {(activeTool === 'drawWall' || activeTool === 'drawShelf') && drawingWallStart && previewEnd && (() => {
             const mat = getMaterial(selectedMaterial);
             return (
               <Line
@@ -546,6 +667,11 @@ export default function FloorCanvas() {
               />
             );
           })()}
+
+          {/* Zone start corner dot */}
+          {activeTool === 'drawZone' && zoneStart && (
+            <Circle x={zoneStart.x} y={zoneStart.y} radius={7 / scale} fill="#27ae60" stroke="#fff" strokeWidth={2 / scale} listening={false} />
+          )}
 
           {/* Scale calibration dots and line */}
           {scalePoint1 && (
@@ -655,6 +781,7 @@ export default function FloorCanvas() {
               </React.Fragment>
             );
           })}
+          </Group>
         </Layer>
       </Stage>
 

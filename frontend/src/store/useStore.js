@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { projectsApi, floorsApi, apsApi, wallsApi } from '../lib/api';
+import { projectsApi, floorsApi, apsApi, wallsApi, shelvingZonesApi } from '../lib/api';
 
 const useStore = create((set, get) => ({
   // ── Project / floor state ──────────────────────────────────────────────────
@@ -9,6 +9,7 @@ const useStore = create((set, get) => ({
   currentFloor: null,
   walls: [],
   accessPoints: [],
+  shelvingZones: [],
   loading: false,
   error: null,
 
@@ -18,6 +19,7 @@ const useStore = create((set, get) => ({
   selectedFrequency: '2.4', // '2.4' or '5'
   showHeatmap: false,
   heatmapMode: 'coverage', // 'coverage' or 'overlap'
+  selectedZoneType: 'shelf_full', // shelving zone type
 
   // ── Scale calibration ──────────────────────────────────────────────────────
   scalePoint1: null, // {x, y} first click
@@ -79,13 +81,14 @@ const useStore = create((set, get) => ({
   },
 
   selectFloor: async (floor) => {
-    set({ currentFloor: floor, walls: [], accessPoints: [], pixelsPerMeter: floor?.pixels_per_meter || 0 });
+    set({ currentFloor: floor, walls: [], accessPoints: [], shelvingZones: [], pixelsPerMeter: floor?.pixels_per_meter || 0 });
     if (floor) {
       const [wallsRes, apsRes] = await Promise.all([
         floorsApi.getWalls(floor.id),
         apsApi.list(floor.id),
       ]);
-      set({ walls: wallsRes.data, accessPoints: apsRes.data });
+      const zonesRes = await shelvingZonesApi.list(floor.id).catch(() => ({ data: [] }));
+      set({ walls: wallsRes.data, accessPoints: apsRes.data, shelvingZones: zonesRes.data });
     }
   },
 
@@ -134,6 +137,7 @@ const useStore = create((set, get) => ({
   setShowHeatmap: (show) => set({ showHeatmap: show }),
   toggleHeatmap: () => set(s => ({ showHeatmap: !s.showHeatmap })),
   setHeatmapMode: (mode) => set({ heatmapMode: mode }),
+  setSelectedZoneType: (type) => set({ selectedZoneType: type }),
 
   // ── Scale calibration actions ──────────────────────────────────────────────
   setScalePoint1: (pt) => set({ scalePoint1: pt }),
@@ -190,6 +194,24 @@ const useStore = create((set, get) => ({
       await wallsApi.delete(wallId);
       set(s => ({ walls: s.walls.filter(w => w.id !== wallId) }));
     }
+  },
+
+  // ── Shelving Zone actions ──────────────────────────────────────────────────
+  addShelvingZone: async (x, y, width, height, zoneType, attenuation_db, attenuation_5ghz) => {
+    const { currentFloor } = get();
+    if (!currentFloor) return;
+    const res = await shelvingZonesApi.create(currentFloor.id, {
+      x, y, width, height,
+      zone_type: zoneType,
+      attenuation_db,
+      attenuation_5ghz,
+    });
+    set(s => ({ shelvingZones: [...s.shelvingZones, res.data] }));
+  },
+
+  deleteShelvingZone: async (zoneId) => {
+    await shelvingZonesApi.delete(zoneId);
+    set(s => ({ shelvingZones: s.shelvingZones.filter(z => z.id !== zoneId) }));
   },
 
   // ── Utility ────────────────────────────────────────────────────────────────

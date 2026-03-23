@@ -16,6 +16,7 @@ class Project(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     floors: Mapped[list["Floor"]] = relationship(back_populates="project", cascade="all, delete-orphan")
 
+
 class Floor(Base):
     __tablename__ = "floors"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
@@ -34,6 +35,7 @@ class Floor(Base):
     project: Mapped["Project"] = relationship(back_populates="floors")
     walls: Mapped[list["Wall"]] = relationship(back_populates="floor", cascade="all, delete-orphan")
     access_points: Mapped[list["AccessPoint"]] = relationship(back_populates="floor", cascade="all, delete-orphan")
+    shelving_zones: Mapped[list["ShelvingZone"]] = relationship(back_populates="floor", cascade="all, delete-orphan")
 
 class Wall(Base):
     __tablename__ = "walls"
@@ -62,3 +64,17 @@ class AccessPoint(Base):
     frequency_ghz: Mapped[float] = mapped_column(Float, default=5.0)
     extra: Mapped[dict | None] = mapped_column(JSON)
     floor: Mapped["Floor"] = relationship(back_populates="access_points")
+
+class ShelvingZone(Base):
+    __tablename__ = "shelving_zones"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
+    floor_id: Mapped[str] = mapped_column(ForeignKey("floors.id"))
+    x: Mapped[float] = mapped_column(Float)
+    y: Mapped[float] = mapped_column(Float)
+    width: Mapped[float] = mapped_column(Float)
+    height: Mapped[float] = mapped_column(Float)
+    zone_type: Mapped[str] = mapped_column(String(50), default="shelf_full")
+    attenuation_db: Mapped[float] = mapped_column(Float, default=12.0)
+    attenuation_5ghz: Mapped[float] = mapped_column(Float, default=20.0)
+    label: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    floor: Mapped["Floor"] = relationship(back_populates="shelving_zones")

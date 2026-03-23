@@ -38,3 +38,9 @@ export const wallsApi = {
   delete: (wallId) => api.delete(`/walls/${wallId}`),
   deleteGroup: (groupId) => api.delete(`/wall-groups/${groupId}`),
 };
+
+export const shelvingZonesApi = {
+  list: (floorId) => api.get(`/floors/${floorId}/shelving-zones`),
+  create: (floorId, data) => api.post(`/floors/${floorId}/shelving-zones`, data),
+  delete: (zoneId) => api.delete(`/shelving-zones/${zoneId}`),
+};

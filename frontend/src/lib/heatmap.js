@@ -27,6 +27,23 @@ function indoorPathLoss(distMeters, freqMhz) {
   return plRef + 10 * n * Math.log10(d) + clutter * distMeters;
 }
 
+// ── Ray vs AABB (axis-aligned rectangle): returns true if ray AP→point crosses zone ──
+function rayIntersectsZone(ax, ay, bx, by, zx, zy, zw, zh) {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const invDx = Math.abs(dx) > 1e-10 ? 1 / dx : (dx >= 0 ? 1e10 : -1e10);
+  const invDy = Math.abs(dy) > 1e-10 ? 1 / dy : (dy >= 0 ? 1e10 : -1e10);
+
+  const tx1 = (zx - ax) * invDx;
+  const tx2 = (zx + zw - ax) * invDx;
+  const ty1 = (zy - ay) * invDy;
+  const ty2 = (zy + zh - ay) * invDy;
+
+  const tmin = Math.max(Math.min(tx1, tx2), Math.min(ty1, ty2), 0.001);
+  const tmax = Math.min(Math.max(tx1, tx2), Math.max(ty1, ty2), 0.999);
+  return tmax > tmin;
+}
+
 function segmentsIntersect(ax1, ay1, ax2, ay2, bx1, by1, bx2, by2) {
   const dx1 = ax2 - ax1, dy1 = ay2 - ay1;
   const dx2 = bx2 - bx1, dy2 = by2 - by1;
@@ -81,7 +98,7 @@ function overlapToColor(count) {
 }
 
 // ── Core: compute signal per AP at each grid cell ────────────────────────────
-function computeSignalGrid(width, height, accessPoints, walls, pixelsPerMeter, frequency) {
+function computeSignalGrid(width, height, accessPoints, walls, shelvingZones, pixelsPerMeter, frequency) {
   const freqMhz = frequency === '5' ? 5200 : 2437;
   const antennaGain = frequency === '5' ? ANTENNA_GAIN_5 : ANTENNA_GAIN_24;
   const attenKey = frequency === '5' ? 'attenuation_5ghz' : 'attenuation_db';
@@ -89,6 +106,11 @@ function computeSignalGrid(width, height, accessPoints, walls, pixelsPerMeter, f
   const wallData = walls.map(w => ({
     x1: w.x1, y1: w.y1, x2: w.x2, y2: w.y2,
     atten: parseFloat(w[attenKey] || w.attenuation_db || 5),
+  }));
+
+  const zoneData = (shelvingZones || []).map(z => ({
+    x: z.x, y: z.y, w: z.width, h: z.height,
+    atten: parseFloat(frequency === '5' ? z.attenuation_5ghz : z.attenuation_db),
   }));
 
   const gridW = Math.ceil(width / GRID_STEP);
@@ -118,6 +140,11 @@ function computeSignalGrid(width, height, accessPoints, walls, pixelsPerMeter, f
         for (const w of wallData) {
           if (segmentsIntersect(ap.x, ap.y, px, py, w.x1, w.y1, w.x2, w.y2)) {
             loss += w.atten;
+          }
+        }
+        for (const z of zoneData) {
+          if (rayIntersectsZone(ap.x, ap.y, px, py, z.x, z.y, z.w, z.h)) {
+            loss += z.atten;
           }
         }
 
@@ -200,11 +227,11 @@ function renderGrid(width, height, grid, gridW, gridH, colorFn, isFloat) {
  * Generate heatmap ImageData.
  * @param {string} mode - "coverage" or "overlap"
  */
-export function generateHeatmap(width, height, accessPoints, walls, pixelsPerMeter, frequency, mode = 'coverage') {
+export function generateHeatmap(width, height, accessPoints, walls, shelvingZones, pixelsPerMeter, frequency, mode = 'coverage') {
   if (!accessPoints.length || pixelsPerMeter <= 0) return null;
 
   const { apSignals, gridW, gridH } = computeSignalGrid(
-    width, height, accessPoints, walls, pixelsPerMeter, frequency
+    width, height, accessPoints, walls, shelvingZones, pixelsPerMeter, frequency
   );
 
   const { bestGrid, overlapGrid } = buildGrids(apSignals, gridW, gridH);

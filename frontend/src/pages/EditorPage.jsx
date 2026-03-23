@@ -8,11 +8,18 @@ import { projectsApi } from '../lib/api';
 import WALL_MATERIALS from '../lib/wallMaterials';
 
 const TOOLS = [
-  { id: 'select',   label: 'Seleziona', icon: '↖' },
-  { id: 'scale',    label: 'Scala',     icon: '📏' },
-  { id: 'measure',  label: 'Righello',  icon: '📐' },
-  { id: 'drawWall', label: 'Muro',      icon: '🧱' },
-  { id: 'placeAP',  label: 'AP',        icon: '📡' },
+  { id: 'select',    label: 'Seleziona', icon: '↖' },
+  { id: 'scale',     label: 'Scala',     icon: '📏' },
+  { id: 'measure',   label: 'Righello',  icon: '📐' },
+  { id: 'drawWall',  label: 'Muro',      icon: '🧱' },
+  { id: 'drawShelf', label: 'Scaffali',  icon: '🛒' },
+  { id: 'placeAP',   label: 'AP',        icon: '📡' },
+];
+
+const SHELF_MATERIALS = [
+  { id: 'shelf_empty', label: 'Scaffale vuoto'  },
+  { id: 'shelf_full',  label: 'Scaffale pieno'  },
+  { id: 'shelf_wet',   label: 'Scaffale freschi' },
 ];
 
 const btnBase = {
@@ -74,7 +81,12 @@ export default function EditorPage() {
               {TOOLS.map(t => (
                 <button
                   key={t.id}
-                  onClick={() => setActiveTool(t.id)}
+                  onClick={() => {
+                    setActiveTool(t.id);
+                    if (t.id === 'drawShelf' && !selectedMaterial.startsWith('shelf_')) {
+                      setSelectedMaterial('shelf_full');
+                    }
+                  }}
                   style={{
                     ...btnBase,
                     background: activeTool === t.id ? '#2980b9' : '#1a4a8a',
@@ -85,6 +97,25 @@ export default function EditorPage() {
                   {t.icon} {t.label}
                 </button>
               ))}
+
+              {/* Shelf type picker (visible when drawShelf is active) */}
+              {activeTool === 'drawShelf' && (
+                <>
+                  <div style={{ width: 1, height: 24, background: '#1a4a8a', margin: '0 4px' }} />
+                  <select
+                    value={selectedMaterial}
+                    onChange={e => setSelectedMaterial(e.target.value)}
+                    style={{
+                      background: '#1a2744', color: '#ccc', border: '1px solid #e67e22',
+                      borderRadius: 4, padding: '5px 8px', fontSize: 13,
+                    }}
+                  >
+                    {SHELF_MATERIALS.map(m => (
+                      <option key={m.id} value={m.id}>{m.label}</option>
+                    ))}
+                  </select>
+                </>
+              )}
 
               {/* Material picker (visible when drawWall is active) */}
               {activeTool === 'drawWall' && (

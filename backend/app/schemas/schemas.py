@@ -64,6 +64,29 @@ class WallResponse(BaseModel):
     group_id: Optional[str] = None
     model_config = {"from_attributes": True}
 
+class ShelvingZoneCreate(BaseModel):
+    x: float
+    y: float
+    width: float
+    height: float
+    zone_type: str = "shelf_full"
+    attenuation_db: float = 12.0
+    attenuation_5ghz: float = 20.0
+    label: Optional[str] = None
+
+class ShelvingZoneResponse(BaseModel):
+    id: str
+    floor_id: str
+    x: float
+    y: float
+    width: float
+    height: float
+    zone_type: str
+    attenuation_db: float
+    attenuation_5ghz: float
+    label: Optional[str] = None
+    model_config = {"from_attributes": True}
+
 class AccessPointCreate(BaseModel):
     name: str
     model: str = "AP3000"
