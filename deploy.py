@@ -2,9 +2,13 @@ import paramiko
 import os
 import sys
 
-VPS_HOST = "72.62.48.82"
-VPS_USER = "root"
-VPS_PASS = "***REMOVED***"
+# Credenziali lette dall'ambiente: non committare mai host/password nel codice.
+# Preferibile l'autenticazione a chiave SSH (VPS_KEY_FILE o ssh-agent);
+# VPS_PASS resta come fallback opzionale.
+VPS_HOST = os.environ.get("VPS_HOST")
+VPS_USER = os.environ.get("VPS_USER")
+VPS_PASS = os.environ.get("VPS_PASS")
+VPS_KEY_FILE = os.environ.get("VPS_KEY_FILE")
 REMOTE_BASE = "/opt/hamina"
 LOCAL_BASE = "C:/Users/marco.mereu/Hamina"
 
@@ -33,10 +37,19 @@ def run_ssh(client, cmd, desc=""):
     return rc
 
 def main():
+    if not VPS_HOST or not VPS_USER:
+        sys.exit("VPS_HOST/VPS_USER non impostati. Esporta VPS_HOST, VPS_USER e VPS_KEY_FILE (o VPS_PASS).")
     print(f"Connecting to {VPS_HOST}...")
     client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    client.connect(VPS_HOST, username=VPS_USER, password=VPS_PASS, timeout=30)
+    client.load_system_host_keys()
+    client.set_missing_host_key_policy(paramiko.RejectPolicy())
+    client.connect(
+        VPS_HOST,
+        username=VPS_USER,
+        password=VPS_PASS,
+        key_filename=VPS_KEY_FILE,
+        timeout=30,
+    )
     print("Connected.\n")
 
     # Create remote directories
